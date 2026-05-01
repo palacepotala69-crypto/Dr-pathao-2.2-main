@@ -1,0 +1,181 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isSelf(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email in ['shreal.suraj@gmail.com', 'ishan10gautam@gmail.com', 'user.suniltim@gmail.com']
+      );
+    }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // --- Validation Blueprints ---
+
+    function isValidUser(data) {
+      let requiredFields = ['name', 'email', 'role', 'onboardingComplete', 'createdAt', 'updatedAt'];
+      return data.keys().hasAll(requiredFields) && data.keys().size() <= 16 // Allow optional fields
+        && data.name is string && data.name.size() <= 100
+        && data.email is string && data.email.size() <= 100
+        && data.role in ['patient', 'admin', 'provider', 'lab']
+        && data.onboardingComplete is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidReminder(data) {
+      let requiredFields = ['id', 'userId', 'title', 'type', 'time', 'createdAt'];
+      return data.keys().hasAll(requiredFields) && data.keys().size() <= 10
+        && data.id is string && data.id.size() <= 128
+        && data.userId == request.auth.uid
+        && data.title is string && data.title.size() <= 200
+        && data.type is string && data.type.size() <= 50
+        && data.time is string && data.time.size() <= 100
+        && data.createdAt is timestamp;
+    }
+
+    function isValidAppointment(data) {
+      let requiredFields = ['doctorId', 'userId', 'status', 'fee', 'createdAt'];
+      return data.keys().hasAll(requiredFields) && data.keys().size() <= 16
+        && data.userId == request.auth.uid
+        && data.status in ['pending', 'confirmed', 'cancelled', 'completed']
+        && data.fee is number && data.fee >= 0
+        && data.createdAt is timestamp;
+    }
+
+    function isValidPrescription(data) {
+      let requiredFields = ['userId', 'medicines', 'id'];
+      return data.keys().hasAll(requiredFields) && data.keys().size() <= 8
+        && data.userId == request.auth.uid
+        && data.medicines is list
+        && data.id is string;
+    }
+
+    // --- Collection Rules ---
+
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow get: if isSelf(userId) || isAdmin();
+      allow list: if isAdmin() || (resource.data.role in ['provider', 'lab'] && (resource.data.get(['providerInfo', 'isVerified'], false) == true || resource.data.get('is_approved', false) == true));
+      
+      allow create: if isSelf(userId) && isValidUser(incoming()) 
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && incoming().role != 'admin'; // Cannot self-assign admin role
+
+      allow update: if (isSelf(userId) || isAdmin()) && isValidUser(incoming()) && (
+        (isSelf(userId) && incoming().updatedAt == request.time
+          && incoming().role == existing().role // Role immutable for user
+          && incoming().email == existing().email // Email immutable
+          && incoming().createdAt == existing().createdAt // CreatedAt immutable
+          && (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'avatar', 'dob', 'age', 'sex', 'bloodGroup', 'address', 'onboardingComplete', 'updatedAt', 'phoneVerified', 'emergencyContact', 'providerType', 'providerInfo', 'education', 'affiliatedHospitals', 'companyRegNumber', 'technicianDetails']))
+          // Protection: Users cannot verify themselves
+          && (!('providerInfo' in incoming()) || !('providerInfo' in existing()) || incoming().providerInfo.get('isVerified', false) == existing().get(['providerInfo', 'isVerified'], false))
+        ) || isAdmin()
+      );
+
+      match /reminders/{reminderId} {
+        allow read: if isSelf(userId) || isAdmin();
+        allow create: if isSelf(userId) && isValidId(reminderId) && isValidReminder(incoming()) && incoming().createdAt == request.time;
+        allow update: if isSelf(userId) && isValidId(reminderId) && isValidReminder(incoming())
+          && (incoming().diff(existing()).affectedKeys().hasOnly(['title', 'type', 'time', 'frequency', 'active', 'notes', 'dosage', 'taken']))
+          && incoming().createdAt == existing().createdAt;
+        allow delete: if isSelf(userId);
+      }
+
+      match /events/{eventId} {
+        allow read: if isSelf(userId) || isAdmin();
+        allow write: if isSelf(userId) && isValidId(eventId);
+      }
+
+      match /dismissed_events/{eventId} {
+        allow read, write: if isSelf(userId);
+      }
+    }
+
+    match /doctors/{doctorId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /appointments/{appointmentId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.doctorId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid || resource.data.doctorId == request.auth.uid);
+      
+      allow create: if isVerified() && isValidAppointment(incoming()) 
+        && incoming().status == 'pending'
+        && incoming().createdAt == request.time;
+      
+      allow update: if isVerified() && (
+        (existing().userId == request.auth.uid && incoming().status == 'cancelled' 
+          && incoming().doctorId == existing().doctorId
+          && incoming().userId == existing().userId
+          && incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
+        (existing().doctorId == request.auth.uid 
+          && incoming().doctorId == existing().doctorId
+          && incoming().userId == existing().userId
+          && (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) || (incoming().status == 'completed' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))) ) ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /medicines/{medicineId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /prescriptions/{prescriptionId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isVerified() && isValidId(prescriptionId) && isValidPrescription(incoming());
+      allow delete: if isSelf(resource.data.userId) || isAdmin();
+    }
+
+    match /lab_tests/{testId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /lab_bookings/{bookingId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isVerified() && incoming().userId == request.auth.uid && exists(/databases/$(database)/documents/lab_tests/$(incoming().testId));
+      allow update, delete: if isAdmin();
+    }
+
+    match /nurses/{nurseId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /nursing_bookings/{bookingId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isVerified() && incoming().userId == request.auth.uid && exists(/databases/$(database)/documents/nurses/$(incoming().nurseId));
+      allow update, delete: if isAdmin();
+    }
+
+    match /master_calendar/{eventId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

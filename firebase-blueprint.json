@@ -1,0 +1,282 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Store personal health information and profile details.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "avatar": { "type": "string" },
+        "role": { "type": "string", "enum": ["patient", "admin", "provider"] },
+        "providerType": { "type": "string", "enum": ["doctor", "nurse", "pharmacist", "lab", "physiotherapist", "psychologist"] },
+        "providerInfo": {
+          "type": "object",
+          "properties": {
+            "specialty": { "type": "string" },
+            "qualification": { "type": "string" },
+            "experience": { "type": "integer" },
+            "consultationFee": { "type": "number" },
+            "bio": { "type": "string" },
+            "isVerified": { "type": "boolean" },
+            "available": { "type": "boolean" },
+            "clinicName": { "type": "string" },
+            "licenseNumber": { "type": "string" },
+            "services": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "dob": { "type": "string" },
+        "age": { "type": "integer" },
+        "sex": { "type": "string", "enum": ["male", "female", "other"] },
+        "bloodGroup": { "type": "string" },
+        "address": { "type": "string" },
+        "emergencyContact": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "phone": { "type": "string" }
+          }
+        },
+        "onboardingComplete": { "type": "boolean" },
+        "phoneVerified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "Doctor": {
+      "title": "Doctor",
+      "description": "Doctors available for consultation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "specialty": { "type": "string" },
+        "qualification": { "type": "string" },
+        "experience": { "type": "integer" },
+        "rating": { "type": "number" },
+        "consultationFee": { "type": "number" },
+        "available": { "type": "boolean" },
+        "avatar": { "type": "string" },
+        "bio": { "type": "string" },
+        "types": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "name", "specialty"]
+    },
+    "Reminder": {
+      "title": "Health Reminder",
+      "description": "Medication or health reminders set by the user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["medication", "vaccination", "cycle", "appointment", "followup"] },
+        "time": { "type": "string" },
+        "frequency": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
+        "active": { "type": "boolean" },
+        "notes": { "type": "string" },
+        "dosage": { "type": "string" },
+        "taken": { "type": "boolean" }
+      },
+      "required": ["id", "userId", "title", "type", "time"]
+    },
+    "CalendarEvent": {
+      "title": "Calendar Event",
+      "description": "A health event on the user's calendar.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "time": { "type": "string" },
+        "type": { "type": "string", "enum": ["public", "personal"] },
+        "category": { "type": "string", "enum": ["health_day", "appointment", "medication", "cycle", "alert", "vaccination", "screening", "lab_test"] },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed", "skipped"] },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "title", "date", "type", "category"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Doctor consultation booking.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "doctorId": { "type": "string" },
+        "doctorName": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "fee": { "type": "number" },
+        "type": { "type": "string", "enum": ["tele", "home"] },
+        "preferredDate": { "type": "string", "format": "date" },
+        "preferredTime": { "type": "string" },
+        "bookingOption": { "type": "string", "enum": ["scheduled", "asap", "queue"] }
+      },
+      "required": ["id", "doctorId", "userId", "status", "fee"]
+    },
+    "Medicine": {
+      "title": "Medicine",
+      "description": "Medicines available in the pharmacy.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "brand": { "type": "string" },
+        "price": { "type": "number" },
+        "img": { "type": "string" }
+      },
+      "required": ["id", "name", "price"]
+    },
+    "Prescription": {
+      "title": "Prescription",
+      "description": "Extracted medical prescription details.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "medicines": { "type": "array" },
+        "processedAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "userId", "medicines"]
+    },
+    "LabTest": {
+      "title": "Lab Test",
+      "description": "Available diagnostic laboratory tests.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "fee": { "type": "number" }
+      },
+      "required": ["id", "name", "fee"]
+    },
+    "LabBooking": {
+      "title": "Lab Booking",
+      "description": "Booking for a lab test.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "testId": { "type": "string" },
+        "testName": { "type": "string" },
+        "category": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "time": { "type": "string" },
+        "location": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed", "cancelled"] },
+        "fee": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "testId", "date", "status"]
+    },
+    "Nurse": {
+      "title": "Nurse",
+      "description": "Nursing staff available for home care.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "exp": { "type": "string" },
+        "rating": { "type": "number" },
+        "fee": { "type": "number" },
+        "specialty": { "type": "string" },
+        "available": { "type": "boolean" }
+      },
+      "required": ["id", "name", "fee"]
+    },
+    "NursingBooking": {
+      "title": "Nursing Booking",
+      "description": "Booking for nursing services.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "nurseId": { "type": "string" },
+        "nurseName": { "type": "string" },
+        "location": { "type": "string" },
+        "duration": { "type": "string" },
+        "startDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["pending", "completed", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "totalFee": { "type": "number" }
+      },
+      "required": ["id", "userId", "nurseId", "startDate", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles."
+    },
+    "/users/{userId}/reminders/{reminderId}": {
+      "schema": "Reminder",
+      "description": "User specific medication and health reminders."
+    },
+    "/users/{userId}/events/{eventId}": {
+      "schema": "CalendarEvent",
+      "description": "User personal calendar events."
+    },
+    "/users/{userId}/dismissed_events/{eventId}": {
+      "schema": "object",
+      "description": "Global events hidden by the user."
+    },
+    "/master_calendar/{eventId}": {
+      "schema": "CalendarEvent",
+      "description": "Public health events and alerts."
+    },
+    "/doctors/{doctorId}": {
+      "schema": "Doctor",
+      "description": "Doctor directory."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Consultation bookings for doctors."
+    },
+    "/medicines/{medicineId}": {
+      "schema": "Medicine",
+      "description": "Pharmacy inventory stock."
+    },
+    "/prescriptions/{prescriptionId}": {
+      "schema": "Prescription",
+      "description": "Scanned and AI-extracted prescriptions."
+    },
+    "/lab_tests/{testId}": {
+      "schema": "LabTest",
+      "description": "Available diagnostic laboratory tests."
+    },
+    "/lab_bookings/{bookingId}": {
+      "schema": "LabBooking",
+      "description": "Bookings for lab tests."
+    },
+    "/nurses/{nurseId}": {
+      "schema": "Nurse",
+      "description": "Professional nursing staff directory."
+    },
+    "/nursing_bookings/{bookingId}": {
+      "schema": "NursingBooking",
+      "description": "Bookings for home nursing services."
+    },
+    "/announcements/{announcementId}": {
+      "schema": "object",
+      "description": "Global announcements and broadcast messages."
+    },
+    "/admins/{adminId}": {
+      "schema": "object",
+      "description": "Registry of admin authorized users."
+    }
+  }
+}
